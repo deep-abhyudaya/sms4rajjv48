@@ -158,6 +158,27 @@ export default function KanbanBoard({
     }
   }, [storageKey, columns]);
 
+  // Handle new items coming in via props (e.g., after server action creates them)
+  useEffect(() => {
+    setItems((prevItems) => {
+      // Create a map of existing items by ID for quick lookup
+      const existingItemsMap = new Map(prevItems.map((item) => [String(item.id), item]));
+
+      // Merge new items with existing items
+      const mergedItems = initialItems.map((newItem) => {
+        const existingItem = existingItemsMap.get(String(newItem.id));
+        if (existingItem) {
+          // Item exists, preserve its status from state
+          return { ...newItem, status: existingItem.status };
+        }
+        // New item, use its default status or first column
+        return { ...newItem, status: newItem.status || columns[0].id };
+      });
+
+      return mergedItems;
+    });
+  }, [initialItems, columns]);
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );

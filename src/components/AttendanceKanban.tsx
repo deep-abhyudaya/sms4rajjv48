@@ -193,22 +193,38 @@ export default function AttendanceKanban({
 
       const existingMap = new Map(existing.map((e) => [e.studentId, e.present]));
 
+      let p: Student[] = [];
+      let a: Student[] = [];
+
       if (existingMap.size > 0) {
         // Pre-populate from existing records
-        const p: Student[] = [];
-        const a: Student[] = [];
         students.forEach((s) => {
           const isPresent = existingMap.get(s.id);
           if (isPresent === true) p.push(s);
           else if (isPresent === false) a.push(s);
           else p.push(s); // default new students to present
         });
-        setPresent(p);
-        setAbsent(a);
       } else {
         // Default all to present
-        setPresent(students);
-        setAbsent([]);
+        p = students;
+        a = [];
+      }
+
+      setPresent(p);
+      setAbsent(a);
+
+      // Auto-save attendance for newly loaded students (only if no existing records)
+      if (existingMap.size === 0 && p.length > 0) {
+        const entries: BulkAttendanceEntry[] = [
+          ...p.map((s) => ({ studentId: s.id, present: true })),
+          ...a.map((s) => ({ studentId: s.id, present: false })),
+        ];
+        startTransition(async () => {
+          const res = await bulkMarkAttendance(lesson.id, selectedDate, entries);
+          if (!res.success) {
+            toast.error("Failed to auto-save attendance.");
+          }
+        });
       }
     } catch (e) {
       toast.error("Failed to load students.");
@@ -228,14 +244,34 @@ export default function AttendanceKanban({
         getAttendanceForLesson(selectedLesson.id, date),
       ]);
       const existingMap = new Map(existing.map((e) => [e.studentId, e.present]));
+
+      let p: Student[] = [];
+      let a: Student[] = [];
+
       if (existingMap.size > 0) {
-        const p: Student[] = [], a: Student[] = [];
         students.forEach((s) => {
           existingMap.get(s.id) === false ? a.push(s) : p.push(s);
         });
-        setPresent(p); setAbsent(a);
       } else {
-        setPresent(students); setAbsent([]);
+        p = students;
+        a = [];
+      }
+
+      setPresent(p);
+      setAbsent(a);
+
+      // Auto-save attendance for newly loaded students on new date
+      if (existingMap.size === 0 && p.length > 0) {
+        const entries: BulkAttendanceEntry[] = [
+          ...p.map((s) => ({ studentId: s.id, present: true })),
+          ...a.map((s) => ({ studentId: s.id, present: false })),
+        ];
+        startTransition(async () => {
+          const res = await bulkMarkAttendance(selectedLesson.id, date, entries);
+          if (!res.success) {
+            toast.error("Failed to auto-save attendance.");
+          }
+        });
       }
     } catch { toast.error("Failed to load."); }
     finally { setLoading(false); }
